@@ -246,8 +246,8 @@ public abstract class Bt20Base extends BtHRBase {
     }
 
     private synchronized void connected(final BluetoothSocket bluetoothSocket,
-            final BluetoothDevice bluetoothDevice,
-            final String btDeviceName) {
+                                        final BluetoothDevice bluetoothDevice,
+                                        final String btDeviceName) {
         cancelThreads();
 
         if (hrClient != null) {
@@ -414,6 +414,9 @@ public abstract class Bt20Base extends BtHRBase {
             // Cancel discovery to prevent slow down
             btAdapter.cancelDiscovery();
 
+            // JB added this in to get mIsConnected
+            // reportConnected(true);
+
             // Reset the ConnectThread since we are done
             synchronized (Bt20Base.this) {
                 connectThread = null;
@@ -443,7 +446,7 @@ public abstract class Bt20Base extends BtHRBase {
         //private final String deviceName;
 
         public ConnectedThread(final BluetoothDevice device, final String deviceName,
-                final BluetoothSocket bluetoothSocket) {
+                               final BluetoothSocket bluetoothSocket) {
             //this.bluetoothDevice = device;
             this.bluetoothSocket = bluetoothSocket;
             //this.deviceName = deviceName;
@@ -467,7 +470,7 @@ public abstract class Bt20Base extends BtHRBase {
         private void readHR() {
             Integer hr[] = new Integer[1];
             final int frameSize = getFrameSize();
-            byte[] buffer = new byte[2 * frameSize];
+            byte[] buffer = new byte[2 * frameSize]; // was new byte[2 * frameSize]
             int bytesInBuffer = 0;
 
             // Keep listening to the inputStream while connected
@@ -487,7 +490,8 @@ public abstract class Bt20Base extends BtHRBase {
                         hrValue = hr[0];
                         hrTimestamp = System.currentTimeMillis();
 
-                        if (hrValue > 0 && mIsConnecting) {
+                         if (hrValue > 0 && mIsConnecting) {
+//                        if (hrValue > 0) {
                             log("hrValue: " + hrValue + " => reportConnected");
                             reportConnected(true);
                         }
@@ -506,9 +510,11 @@ public abstract class Bt20Base extends BtHRBase {
                         }
                     }
 
-                    if (bytesUsed > 0) {
+                    if ((bytesUsed > 0) && (bytesUsed < bytesInBuffer)) {
                         System.arraycopy(buffer, bytesUsed, buffer, 0, bytesInBuffer - bytesUsed);
                         bytesInBuffer -= bytesUsed;
+                    } else if (bytesUsed > bytesInBuffer) {
+                        bytesInBuffer = 0;
                     } else if (bytesUsed == 0 && bytesInBuffer == buffer.length) {
                         log("reset");
                         bytesInBuffer = 0;
@@ -673,6 +679,89 @@ public abstract class Bt20Base extends BtHRBase {
 
     }
 
+    public static class RawSerialHRMold extends Bt20BaseOld {
+
+        static final byte RAW_SER_HXM_BYTE_STX = 0;
+        static final byte RAW_SER_HXM_BYTE_HR = 1;
+        static final byte RAW_SER_HXM_BYTE_CRC = 2;
+        static final byte RAW_SER_HXM_BYTE_ETX = 3;
+
+        static final byte RAW_SER_START_BYTE = 97;
+        static final byte RAW_SER_END_BYTE = 100;
+        public static final String NAME = "Raw Serial";
+
+        public RawSerialHRMold(Context ctx) {
+            super(ctx);
+        }
+
+        @Override
+        public String getName() {
+            return NAME;
+        }
+
+        @Override
+        public String getProviderName() {
+            return NAME;
+        }
+
+        @Override
+        public int getFrameSize() {
+            return RAW_SER_HXM_BYTE_ETX; // + 1;
+        }
+
+        @Override
+        public int parseBuffer(byte[] buffer) {
+            // Check STX (Start of Text), ETX (End of Text) and CRC Checksum
+
+            boolean ok = buffer.length > RAW_SER_HXM_BYTE_ETX
+                    && getByte(buffer[RAW_SER_HXM_BYTE_STX]) == RAW_SER_START_BYTE
+                    && getByte(buffer[RAW_SER_HXM_BYTE_ETX]) == RAW_SER_END_BYTE;
+            // && calcCrc8(buffer, 3, 55) == getByte(buffer[ZEPHYR_HXM_BYTE_CRC]);
+
+            if (!ok) {
+                log("HxM insanity! "
+                        + (buffer.length > RAW_SER_HXM_BYTE_ETX) + " "
+                        + getByte(buffer[RAW_SER_HXM_BYTE_STX]) + "=="
+                        + RAW_SER_START_BYTE + " "
+                        + getByte(buffer[RAW_SER_HXM_BYTE_ETX]) + "=="
+                        + RAW_SER_END_BYTE + " " + "calc="
+                        // + calcCrc8(buffer, 3, 55) + " " + "given="
+                        + getByte(buffer[RAW_SER_HXM_BYTE_CRC]));
+                return -1;
+            }
+            log("HxM good!!!");
+            return getByte(buffer[RAW_SER_HXM_BYTE_HR]);
+        }
+
+        @Override
+        public int findNextAlignment(byte[] buffer) {
+            for (int i = 0; i < buffer.length - 1; i++) {
+                if (getByte(buffer[i]) == RAW_SER_END_BYTE &&
+                        getByte(buffer[i + 1]) == RAW_SER_START_BYTE) {
+                    return i + 1;
+                }
+            }
+            return -1;
+        }
+
+        private static int calcCrc8(byte buffer[], @SuppressWarnings("SameParameterValue") int start, @SuppressWarnings("SameParameterValue") int length) {
+            int crc = 0x0;
+
+            for (int i = start; i < (start + length); i++) {
+                crc ^= getByte(buffer[i]);
+                for (int b = 0; b <= 7; b++) {
+                    if ((crc & 1) != 0) {
+                        crc = ((crc >> 1) ^ 0x8c);
+                    } else {
+                        crc = (crc >> 1);
+                    }
+                }
+            }
+            return crc;
+        }
+
+    }
+
     public static class PolarHRM extends Bt20Base {
 
         public static final String NAME = "Polar WearLink";
@@ -802,6 +891,80 @@ public abstract class Bt20Base extends BtHRBase {
         }
     }
 
+    public static class RawSerialHRM extends Bt20Base {
+
+        public static final String NAME = "Raw Serial";
+
+        public RawSerialHRM(Context ctx) {
+            super(ctx);
+        }
+
+        @Override
+        public String getName() {
+            return NAME;
+        }
+
+        @Override
+        public String getProviderName() {
+            return NAME;
+        }
+
+        @Override
+        public int getFrameSize() {
+            return 16;
+        }
+
+        private boolean startOfMessage(byte buffer[], int bytesInBuffer, int pos) {
+            if (bytesInBuffer < pos + 4)
+                return false;
+
+            //noinspection PointlessArithmeticExpression
+            int b0 = getByte(buffer[pos + 0]);
+            int b1 = getByte(buffer[pos + 1]); // len
+            int b2 = getByte(buffer[pos + 2]);
+            int b3 = getByte(buffer[pos + 3]);
+            if (b0 != 0x61) {
+                return false;
+            }else{
+                int a =3;
+            }
+
+//            if ((0xFF - b1) != b2) {
+//                return false;
+//            }
+
+            if (b2 != 0x63) {
+                return false;
+            }
+
+            if (b3 != 0x64) {
+                return false;
+            }
+
+            //noinspection RedundantIfStatement
+            // if (bytesInBuffer < pos + b1)
+            //     return false;
+
+            return true;
+        }
+
+        @Override
+        public int parseBuffer(byte[] buffer, int bytesInBuffer, Integer hrVal[]) {
+            hrVal[0] = null;
+            for (int i = 0; i < bytesInBuffer; i++) {
+                boolean validMessage = startOfMessage(buffer, bytesInBuffer, i);
+                // if (startOfMessage(buffer, bytesInBuffer, i)) {
+                if (validMessage) {
+                    int bytesUsed = getByte(buffer[i + 3]);
+                    hrVal[0] = getByte(buffer[i + 1 ]);
+                    // hrVal[0] = 100;
+                    return bytesUsed;
+                }
+            }
+            return 0;
+        }
+    }
+
     private static int getByte(byte b) {
         return b & 0xFF;
     }
@@ -809,4 +972,7 @@ public abstract class Bt20Base extends BtHRBase {
     public static HRDeviceRef createDeviceRef(String providerName, BluetoothDevice device) {
         return HRDeviceRef.create(providerName, device.getName(), device.getAddress());
     }
+
+
+
 }

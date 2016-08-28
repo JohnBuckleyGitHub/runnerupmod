@@ -55,6 +55,15 @@
     </Preference>
 
     <Preference
+        android:key="cue_configure_ano"
+        android:title="@string/Anemometer">
+        <intent
+            android:targetPackage="org.runnerup"
+            android:targetClass="org.runnerup.view.AnoSettingsActivity" />
+    </Preference>
+
+
+    <Preference
         android:key="cue_configure_hrzones"
         android:title="@string/Heart_Rate_Zones">
             <intent

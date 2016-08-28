@@ -57,6 +57,7 @@
   <string name="Device">Device</string>
   <string name="Start_hour">Start hour</string>
   <string name="Heart_rate">Heart rate</string>
+  <string name="Ano_Pressure1">Pressure Sensor 1</string>
   <string name="Pace">Pace</string>
   <string name="Scan">Scan</string>
   <string name="Connect">Connect</string>
@@ -178,6 +179,7 @@
   <string name="Accounts">Accounts</string>
   <string name="Audio_cues">Audio cues</string>
   <string name="Heart_Rate_Monitor">Heart Rate Monitor</string>
+  <string name="Anemometer">Anemometer</string>
   <string name="Heart_Rate_Zones">Heart Rate Zones</string>
   <string name="Autolap">Autolap</string>
   <string name="Autolap_m">Autolap (m)</string>

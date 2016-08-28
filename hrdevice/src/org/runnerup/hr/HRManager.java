@@ -69,6 +69,11 @@ public class HRManager {
                 return null;
             return new Bt20Base.ZephyrHRM(ctx);
         }
+        if (src.contentEquals(Bt20Base.RawSerialHRM.NAME)) {
+            if (!Bt20Base.checkLibrary(ctx))
+                return null;
+            return new Bt20Base.RawSerialHRM(ctx);
+        }
         if (src.contentEquals(Bt20Base.PolarHRM.NAME)) {
             if (!Bt20Base.checkLibrary(ctx))
                 return null;
@@ -130,6 +135,10 @@ public class HRManager {
 
         if (Bt20Base.checkLibrary(ctx)) {
             providers.add(new Bt20Base.PolarHRM(ctx));
+        }
+
+        if (Bt20Base.checkLibrary(ctx)) {
+            providers.add(new Bt20Base.RawSerialHRM(ctx));
         }
 
         if (experimental && Bt20Base.checkLibrary(ctx)) {
